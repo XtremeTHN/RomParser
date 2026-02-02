@@ -13,13 +13,11 @@ class NotAPFS0(Exception):
 
 class PFSItem(Region):
     name: str
-    size: int
     entry: PartitionEntry
 
     def __init__(self, file: File, name: str, entry: PartitionEntry, data_pos: int):
         self.entry = entry
         self.name = name
-        self.size = entry.size
     
         super().__init__(file.obj, entry.offset + data_pos, self.entry.size)
 

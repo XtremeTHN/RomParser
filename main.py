@@ -9,14 +9,14 @@ print(
     "reserved:", p.reserved
 )
 
-for x in p.get_files():
-    print(x.name, x.size)
+for x in p.get_ncas():
+    print(x.name, x.entry.size)
     n = open(f"out/{x.name}", "wb")
     
     while True:
         chunk = x.read(1024)
         if not chunk:
-            print("end", x.entry.offset, x.size, x.tell())
+            print("end", x.entry.offset, x.entry.size, x.tell())
             break
 
         n.write(chunk)

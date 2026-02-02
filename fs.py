@@ -1,5 +1,5 @@
 from entry import PartitionEntry
-from utils import File, Region, IReadable
+from readers import File, Region, IReadable
 # from nca import Nca
 
 class FsEntry:

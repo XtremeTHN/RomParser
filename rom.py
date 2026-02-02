@@ -1,5 +1,5 @@
 from fs import PFS0
-from utils import File
+from readers import File
 from nca import Nca
 
 class Nsp(PFS0):

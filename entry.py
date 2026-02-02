@@ -7,5 +7,4 @@ class PartitionEntry:
     reserved: int
 
     def __init__(self, data: bytes):
-        # print(len(data), data)
         self.offset, self.size, self.string_offset, self.reserved = struct.unpack("<QQII", data)

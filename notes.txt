@@ -1,0 +1,30 @@
+name is in control.nacp
+control.nacp is in a nca with the type of control
+to extract the smallest nca, we need the title key
+titlekey can be obtained in .tik, is in the offset 0x180 and its size is 16
+hactool $SMALLEST_NCA --titlekey=$TITLEKEY --section0dir="out/exefs" --romfsdir="out/romfs"
+
+The control.nacp has the game name in languages:
+Order:
+0  Japanese
+1  American English
+2  French
+3  German
+4  Italian
+5  Spanish
+6  Chinese (Simplified)
+7  Korean
+8  Dutch
+9  Portuguese
+10 Russian
+11 Chinese (Traditional)
+12 British English
+13 Canadian French
+14 Latin American Spanish
+15 Brazilian Portuguese
+
+Each title entry has a fixed total size of 0x300
+struct TitleEntry {
+    char name[0x200];
+    char publisher[0x100];
+}

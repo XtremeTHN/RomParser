@@ -131,7 +131,7 @@ class Region(Readable):
 
         total_offset = self.offset + offset
         if (total_offset > self.end):
-            raise OutOfBounds(f"maximum: {self.end}, provided offset: {offset}, offset: {self.offset}")
+            raise OutOfBounds(f"end: {self.end}, provided offset: {offset}, offset: {self.offset}")
         return total_offset
 
     def seek(self, offset):

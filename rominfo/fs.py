@@ -19,7 +19,10 @@ class PFSItem(Region):
         self.entry = entry
         self.name = name
     
-        super().__init__(file.obj, entry.offset + data_pos, self.entry.size)
+        super().__init__(file, entry.offset + data_pos, self.entry.size)
+    
+    def __repr__(self):
+        return f"<PFSItem(name={self.name}, offset={self.offset}, end={self.end})>"
 
 class PFS0:
     magic: str

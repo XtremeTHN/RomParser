@@ -160,3 +160,7 @@ class FsHeader:
 
     def i(self, en, v):
         return en(int.from_bytes(v))
+
+class InvalidFs(Exception):
+    def __init__(self, expected, given):
+        super().__init__(f"Invalid filesystem: expected {expected}, given {given}")

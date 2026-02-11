@@ -1,6 +1,6 @@
 from fs.entry import PartitionEntry
 from readers import File, MemoryRegion, Region
-from fs.fs import FsEntry, FsHeader
+from fs.fs import FsEntry, FsHeader, FsType, InvalidFs
 from fs.pfs0 import PFSItem
 from utils import media_to_bytes
 from enum import Enum
@@ -163,6 +163,12 @@ class Nca(PFSItem):
             )
 
         self.fs_headers = headers
+    
+    def open_romfs(self, header: FsHeader):
+        if header.fs_type != FsType.ROM_FS:
+            raise InvalidFs(FsType.ROM_FS, header.fs_type)
+        
+        
     
     def get_key_generation(self):
         old = self.key_generation_old.value

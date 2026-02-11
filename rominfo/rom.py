@@ -1,4 +1,4 @@
-from fs import PFS0
+from fs.pfs0 import PFS0
 from readers import File
 from nca import Nca
 import os

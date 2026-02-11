@@ -1,10 +1,11 @@
-from entry import PartitionEntry
-from readers import File, MemoryRegion
-from fs import PFSItem
+from fs.entry import PartitionEntry
+from readers import File, MemoryRegion, Region
+from fs.fs import FsEntry, FsHeader
+from fs.pfs0 import PFSItem
 from enum import Enum
 
 from keys import Keyring
-
+import struct
 
 
 class InvalidNCA(Exception):
@@ -74,9 +75,15 @@ class Nca(PFSItem):
     program_id: int
     content_index: int
     sdk_addon_version: str
+    key_generation: KeyGeneration
     rights_id: str
 
     magic: str
+
+    fs_entries: list[FsEntry]
+    decrypted_header: MemoryRegion
+
+    key_area: list[str]
 
     def __init__(self, file: File, name: str, entry: PartitionEntry, data_pos: int):
         super().__init__(file, name, entry, data_pos)
@@ -85,25 +92,81 @@ class Nca(PFSItem):
         self.keyring = Keyring.get_default()
         
         header = self.read_at(0, 0xC00)
-        self.decrypted_header = MemoryRegion(self.keyring.aes_xts_decrypt("header_key", header, 0x400, 0, 0x200))
+        dec = self.keyring.aes_xts_decrypt("header_key", header, 0x400, 0, 0x200)
 
-        self.magic = self.decrypted_header.read_at(0x200, 0x4)
+        self.magic = dec[0x200:0x204]
 
-        if self.magic.startswith(b"NCA") is False:
-            print("warn: invalid nca magic:", self.magic)
-            return
+        match self.magic:
+            case b"NCA3":
+                self.handle_nca3(header)
+            case _:
+                raise InvalidNCA("invalid magic:", self.magic)
         
-        self.distribution_type = DistributionType(int.from_bytes(self.decrypted_header.read_at(0x204, 1)))
-        self.content_type = ContentType(int.from_bytes(self.decrypted_header.read_at(0x205, 0x1)))
-        self.key_generation_old = KeyGenOld(int.from_bytes(self.decrypted_header.read_at(0x206, 0x1)))
-        self.key_area_encryption_key_index = KeyAreaEncryptionKeyIndex(int.from_bytes(self.decrypted_header.read_at(0x207, 0x1)))
+        self.populate_fs_entries()
 
-        self.content_size = self.decrypted_header.read_to(0x208, 0x8, "<Q")
-        self.program_id = self.decrypted_header.read_to(0x210, 0x8, "<q")
-        self.content_index = self.decrypted_header.read_to(0x218, 0x4, "<I")
+    def populate_fs_entries(self):
+        raw_entries = MemoryRegion(self.decrypted_header.read_at(0x240, 0x40))
 
-        sdk_ver_bytes = self.decrypted_header.read_at(0x21C, 0x4)
+        entries = []
+
+        for x in range(4):
+            start = raw_entries.read(4)
+            end = raw_entries.read(4)
+
+            if len(start) == 0 and len(end) == 0:
+                print("invalid values")
+                continue
+
+            start = struct.unpack("<I", start)[0]
+            end = struct.unpack("<I", end)[0]
+
+            if start == 0 and end == 0:
+                continue
+
+            entries.append (
+                FsEntry(
+                    start,
+                    end
+                )
+            )
+
+            raw_entries.read(8)
+
+        self.fs_entries = entries
+    
+    def get_fs_header_for_section(self, section: int):
+        start = 0x400 + (section * 0x200)
+        end = 0x200
+
+        data = self.read_at(start, end)
+        return FsHeader(data)
+    
+    def get_key_generation(self):
+        old = self.key_generation_old.value
+        new = self.key_generation.value
+
+        key = old if old < new else new
+        return key - 1 if key > 0 else key
+
+    def handle_nca3(self, _header: bytes):
+        self.decrypted_header = MemoryRegion(self.keyring.aes_xts_decrypt("header_key", _header, 0xC00, 0, 0x200))
+        open("out.bin", "wb").write(self.decrypted_header.source)
+
+        header = self.decrypted_header
+
+        self.distribution_type = DistributionType(int.from_bytes(header.read_at(0x204, 1)))
+        self.content_type = ContentType(int.from_bytes(header.read_at(0x205, 0x1)))
+        self.key_generation_old = KeyGenOld(int.from_bytes(header.read_at(0x206, 0x1)))
+        self.key_area_encryption_key_index = KeyAreaEncryptionKeyIndex(int.from_bytes(header.read_at(0x207, 0x1)))
+        self.key_generation = KeyGeneration(int.from_bytes(header.read_at(0x220, 0x1)))
+
+        self.content_size = header.read_to(0x208, 0x8, "<Q")
+        self.program_id = header.read_to(0x210, 0x8, "<q")
+        self.content_index = header.read_to(0x218, 0x4, "<I")
+
+        sdk_ver_bytes = header.read_at(0x21C, 0x4)
         self.sdk_addon_version = f"{sdk_ver_bytes[3]}.{sdk_ver_bytes[2]}.{sdk_ver_bytes[1]}.0"
+
 
     # TODO: make a constructor that takes a file and parse it
 

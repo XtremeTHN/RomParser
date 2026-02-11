@@ -1,6 +1,5 @@
-from entry import PartitionEntry
+from fs.entry import PartitionEntry
 from readers import File, Region, IReadable
-# from nca import Nca
 
 class FsEntry:
     start_offset: int

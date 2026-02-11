@@ -63,6 +63,10 @@ class IReadable(ABC):
             format_string (str): The struct.unpack format string
         """
         ...
+    
+    @abstractmethod
+    def dump(self, path):
+        ...
 
 class Readable(IReadable):
     def __init__(self, obj: IReadable):
@@ -82,6 +86,14 @@ class Readable(IReadable):
 
     def read_to(self, offset: int, size: int, format_string: str):
         return struct.unpack(format_string, self.read_at(offset, size))[0]
+
+    def dump(self, path):
+        with open(path, "wb") as f:
+            while True:
+                chunk = self.read(1024)
+                if not chunk:
+                    break
+                f.write(chunk)
 
 class File(Readable):
     obj: BufferedReader
@@ -112,15 +124,23 @@ class MemoryRegion(IReadable):
         self.pos = pos
 
     def read(self, size):
-        res = self.source[self.pos:size]
+        res = self.source[self.pos:self.pos + size]
         self.pos += size
+
         return bytes(res)
 
     def read_at(self, offset, size):
-        return bytes(self.source[offset:offset + size])
+        return self.source[offset:offset + size]
     
     def read_to(self, offset, size, format_str):
         return struct.unpack(format_str, self.read_at(offset, size))[0]
+
+    def __len__(self):
+        return len(self.source)
+
+    def dump(self, path):
+        with open(path, "wb") as f:
+            f.write(self.source)
 
 class Region(Readable):
     def __init__(self, source: IReadable, offset: int, end: int):

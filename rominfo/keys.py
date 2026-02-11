@@ -33,8 +33,8 @@ class Keyring:
             cls._instance = cls()
         return cls._instance
     
-    def aes_decrypt(self, data, key, mode):
-        cipher = Cipher(algorithms.AES, mode(key))
+    def aes_decrypt(self, data, key, mode, extra_arg=None):
+        cipher = Cipher(algorithms.AES(key), mode(extra_arg) if extra_arg is not None else mode())
         d = cipher.decryptor()
         return d.update(data) + d.finalize()
 
@@ -56,21 +56,17 @@ class Keyring:
         if length % sector_size != 0:
             raise ValueError("Length must be multiple of sectors")
 
-        dst = bytearray(length)
+        dst = bytes()
 
         for offset in range(0, length, sector_size):
             tweak = self.get_tweak(sector)
             sector += 1
 
-            cipher = Cipher(
-                algorithms.AES(bytes.fromhex(self.prod[key])),
-                modes.XTS(tweak),
-                backend=default_backend(),
+            dst += self.aes_decrypt(
+                src[offset : offset + sector_size],
+                bytes.fromhex(self.prod[key]),
+                modes.XTS,
+                tweak
             )
-            decryptor = cipher.decryptor()
-
-            dst[offset : offset + sector_size] = decryptor.update(
-                src[offset : offset + sector_size]
-            ) + decryptor.finalize()
 
         return dst

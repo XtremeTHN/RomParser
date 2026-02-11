@@ -1,3 +1,5 @@
 *.nsp
 out*
 __pycache__
+.direnv
+*.bin

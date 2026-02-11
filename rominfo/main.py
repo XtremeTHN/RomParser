@@ -11,12 +11,17 @@ print(
     "reserved:", p.reserved
 )
 
-file = p.get_files()
+file = p.get_file(2)
 
-for x in file:
-    if x.content_type == ContentType.CONTROL:
-        print(Style.BRIGHT + Fore.GREEN + "FOUND" + Style.RESET_ALL)
-        print(x.name, x.sdk_addon_version)
+print(file.content_type, file.content_size)
+
+for x in file.fs_entries:
+    print(x, x.start_offset, x.end_offset)
+# print(file.fs_entries[1].start_offset, file.fs_entries[1].end_offset)
+# file.decrypted_header.dump(f"{file.name}.bin")
+
+# file.get_fs_header_for_section(0
+# file.populate_fs_entries()
 
 # for x in p.get_files():
 #     print(x.name, x.entry.size)

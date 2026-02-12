@@ -3,6 +3,7 @@ import struct
 from typing import Any
 from io import BufferedReader
 from abc import ABC, abstractmethod
+from keys import Keyring, modes
 
 class IReadable(ABC):
     @abstractmethod
@@ -154,6 +155,7 @@ class Region(Readable):
         """
 
         super().__init__(source)
+        
         self.offset = offset
         self.end = end
 
@@ -173,7 +175,7 @@ class Region(Readable):
 
         total_offset = self.offset + offset
         if (total_offset > self.end):
-            raise OutOfBounds(f"end: {self.end}, provided offset: {offset}, offset: {self.offset}")
+            raise OutOfBounds(f"total_offset: {total_offset} end: {self.end} self.offset: {self.offset}")
         return total_offset
 
     def seek(self, offset):
@@ -194,3 +196,64 @@ class Region(Readable):
 
     def read_to(self, offset, size, format_string):
         return super().read_to(self.calc_offset(offset), size, format_string)
+
+class EncryptedCtrRegion(Readable):
+    def __init__(self, source: Region, offset: int, end: int, key: bytes, ctr: int):
+        super().__init__(source)
+
+        self.offset = offset
+        self.end = end
+
+        self.key = key
+        self.ctr = ctr
+    
+    def align_down(self, value: int, align: int):
+        return value & ~(align - 1)
+
+    def align_up(self, value: int, align: int):
+        return (value + (align -1)) & ~(align - 1)
+
+    # im not gonna refactor this
+    def read(self, size):
+        if self.offset >= self.end:
+            return b""
+
+        remaining = self.end - self.offset
+        size = min(size, remaining)
+
+        aligned_offset = self.align_down(self.offset, 0x10)
+        diff = self.offset - aligned_offset
+
+        size_raw = size + diff
+        buf_size = self.align_up(size_raw, 0x10)
+
+        self.obj.seek(aligned_offset)
+        data = self.obj.read(buf_size)
+
+        if not data:
+            return b""
+
+        sector_index = ((aligned_offset >> 4) |
+                        (self.ctr << 64))
+        iv = Keyring.get_tweak(sector_index)
+
+        decryptor = Keyring.get_decryptor(self.key, modes.CTR(iv))
+        decrypted = decryptor.update(data)
+
+        start = diff
+        end = min(start + size, len(decrypted))
+
+        result = decrypted[start:end]
+
+        self.offset += len(result)
+
+        return result
+    
+    def read_at(self, offset, size):
+        self.seek(offset)
+        return self.read(size)
+
+    def read_to(self, offset, size, format_string):
+        self.seek(offset)
+        d = self.read(size)
+        return struct.unpack(format_string, d)

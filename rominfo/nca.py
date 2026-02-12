@@ -1,13 +1,12 @@
 from fs.entry import PartitionEntry
-from readers import File, MemoryRegion, Region
-from fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType
+from readers import File, MemoryRegion, Region, EncryptedCtrRegion
+from fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType, HashType
 from fs.pfs0 import PFSItem
-from utils import media_to_bytes, bytes_default, is_zeroes
+from utils import media_to_bytes, bytes_default
 from enum import Enum
 from dataclasses import dataclass
-from cryptography.hazmat.primitives.ciphers import Cipher, modes, algorithms
 
-from keys import Keyring
+from keys import Keyring, modes
 import struct
 
 
@@ -144,8 +143,6 @@ class Nca(PFSItem):
     def decrypt_key_area(self):
         encrypted_key_area = self.decrypted_header.read_at(0x300, 0x40)
 
-        print(self.key_area_encryption_key_index.value, self.key_generation.value, self.key_generation_old.value)
-
         if not self.rights_id:
             key = self.get_key_area_key()
 
@@ -154,7 +151,6 @@ class Nca(PFSItem):
             )
         else:
             ...
-            # raise NotImplementedError
 
     def populate_fs_entries(self):
         raw_entries = MemoryRegion(self.decrypted_header.read_at(0x240, 0x40))
@@ -212,13 +208,18 @@ class Nca(PFSItem):
     def get_entry_for_header(self, header: FsHeader):
         return [x for x in self.fs_entries if x.index == header.index][0]
     
-    def open_fs(self, header: FsHeader, offset: int):
+    def open_fs(self, header: FsHeader):
         entry = self.get_entry_for_header(header)
         
         if header.encryption_type != EncryptionType.AES_CTR:
             raise Exception("Only aes ctr encryption is supported", header.encryption_type)
         
-        fs_offset = entry.start_offset + offset
+        if header.hash_type == HashType.HIERARCHICAL_INTEGRITY_HASH:
+            fs_offset = entry.start_offset + header.hash_data.info_level_hash.levels[-1].logical_offset
+            key = bytes.fromhex(self.key_area.aes_ctr_key)
+
+            print(header.ctr)
+            return EncryptedCtrRegion(self, fs_offset, entry.end_offset, key, header.ctr)
 
         # TODO: decrypt
     

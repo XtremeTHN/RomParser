@@ -48,13 +48,21 @@ class Keyring:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
+
+    # TODO: move this method to another class
     def aes_decrypt(self, data, key, mode):
-        cipher = Cipher(algorithms.AES(key), mode)
-        d = cipher.decryptor()
+        d = self.get_decryptor(key, mode)
         return d.update(data) + d.finalize()
 
-    def get_tweak(self, sector: int) -> bytes:
+    # TODO: move this method to another class
+    @staticmethod
+    def get_decryptor(key, mode, algorithm=algorithms.AES):
+        cipher = Cipher(algorithm(key), mode)
+        return cipher.decryptor()
+
+    # TODO: move this method to another class
+    @staticmethod
+    def get_tweak(sector: int) -> bytes:
         return int.to_bytes(sector, length=16, byteorder="big")
     
     def aes_xts_decrypt(
@@ -71,7 +79,7 @@ class Keyring:
         dst = bytes()
 
         for offset in range(0, length, sector_size):
-            tweak = self.get_tweak(sector)
+            tweak = Keyring.get_tweak(sector)
             sector += 1
 
             dst += self.aes_decrypt(

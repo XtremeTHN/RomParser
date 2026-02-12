@@ -27,8 +27,7 @@ for x in files:
             print("start_offset:", x.fs_entries[index].start_offset)
             print("end_offset:", x.fs_entries[index].end_offset)
 
-        
-
+        f = x.open_fs(x.fs_headers[0])
 
 # print(file.content_type, file.content_size)
 

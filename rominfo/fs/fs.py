@@ -149,7 +149,7 @@ class FsHeader:
 
         self.meta_hash_type = self.i(MetaDataHashType, r.read_at(0x5, 0x1))
         self.meta_hash_data_info = MetaDataHashDataInfo(r.read_at(0x1A0, 0x30))
-        self.ctr = r.read_at(0x140, 0x4)
+        self.ctr = r.read_to(0x140, 0x8, "<Q")
 
         hash_data = r.read_at(0x8, 0xF8)
         if self.hash_type is HashType.HIERARCHICAL_INTEGRITY_HASH:

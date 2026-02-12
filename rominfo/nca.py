@@ -1,9 +1,11 @@
 from fs.entry import PartitionEntry
 from readers import File, MemoryRegion, Region
-from fs.fs import FsEntry, FsHeader, FsType, InvalidFs
+from fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType
 from fs.pfs0 import PFSItem
-from utils import media_to_bytes
+from utils import media_to_bytes, bytes_default, is_zeroes
 from enum import Enum
+from dataclasses import dataclass
+from cryptography.hazmat.primitives.ciphers import Cipher, modes, algorithms
 
 from keys import Keyring
 import struct
@@ -11,6 +13,19 @@ import struct
 
 class InvalidNCA(Exception):
     ...
+
+@dataclass
+class KeyArea:
+    aes_xts_key: bytes | None
+    aes_ctr_key: bytes | None
+    unk_key: bytes | None
+
+    def __init__(self, data: bytes):
+        r = MemoryRegion(data)
+
+        self.aes_xts_key = r.read(0x20).hex()
+        self.aes_ctr_key = r.read(0x10).hex()
+        self.unk_key = r.read(0x10).hex()
 
 class KeyGeneration(Enum):
     _3_0_1 = 0x03
@@ -89,7 +104,7 @@ class Nca(PFSItem):
     fs_headers: list[FsHeader]
     decrypted_header: MemoryRegion
 
-    key_area: list[str]
+    key_area: KeyArea
 
     def __init__(self, file: File, name: str, entry: PartitionEntry, data_pos: int):
         super().__init__(file, name, entry, data_pos)
@@ -110,6 +125,36 @@ class Nca(PFSItem):
         
         self.populate_fs_entries()
         self.populate_fs_headers()
+        self.decrypt_key_area()
+    
+    def get_key_area_key(self):
+        gen = self.get_key_generation()
+        keys = None
+
+        match self.key_area_encryption_key_index:
+            case KeyAreaEncryptionKeyIndex.APPLICATION:
+                keys = self.keyring.key_area_application
+            case KeyAreaEncryptionKeyIndex.OCEAN:
+                keys = self.keyring.key_area_ocean
+            case KeyAreaEncryptionKeyIndex.SYSTEM:
+                keys = self.keyring.key_area_system
+        
+        return keys[gen]
+    
+    def decrypt_key_area(self):
+        encrypted_key_area = self.decrypted_header.read_at(0x300, 0x40)
+
+        print(self.key_area_encryption_key_index.value, self.key_generation.value, self.key_generation_old.value)
+
+        if not self.rights_id:
+            key = self.get_key_area_key()
+
+            self.key_area = KeyArea(
+                self.keyring.aes_decrypt(encrypted_key_area, bytes.fromhex(key), modes.ECB())
+            )
+        else:
+            ...
+            # raise NotImplementedError
 
     def populate_fs_entries(self):
         raw_entries = MemoryRegion(self.decrypted_header.read_at(0x240, 0x40))
@@ -163,18 +208,29 @@ class Nca(PFSItem):
             )
 
         self.fs_headers = headers
+
+    def get_entry_for_header(self, header: FsHeader):
+        return [x for x in self.fs_entries if x.index == header.index][0]
+    
+    def open_fs(self, header: FsHeader, offset: int):
+        entry = self.get_entry_for_header(header)
+        
+        if header.encryption_type != EncryptionType.AES_CTR:
+            raise Exception("Only aes ctr encryption is supported", header.encryption_type)
+        
+        fs_offset = entry.start_offset + offset
+
+        # TODO: decrypt
     
     def open_romfs(self, header: FsHeader):
         if header.fs_type != FsType.ROM_FS:
             raise InvalidFs(FsType.ROM_FS, header.fs_type)
         
-        
-    
-    def get_key_generation(self):
+    def get_key_generation(self) -> int:
         old = self.key_generation_old.value
         new = self.key_generation.value
 
-        key = old if old < new else new
+        key = new if old < new else old
         return key - 1 if key > 0 else key
 
     def handle_nca3(self, _header: bytes):
@@ -188,6 +244,8 @@ class Nca(PFSItem):
         self.key_generation_old = KeyGenOld(int.from_bytes(header.read_at(0x206, 0x1)))
         self.key_area_encryption_key_index = KeyAreaEncryptionKeyIndex(int.from_bytes(header.read_at(0x207, 0x1)))
         self.key_generation = KeyGeneration(int.from_bytes(header.read_at(0x220, 0x1)))
+
+        self.rights_id = bytes_default(header.read_at(0x230, 0x10))
 
         self.content_size = header.read_to(0x208, 0x8, "<Q")
         self.program_id = header.read_to(0x210, 0x8, "<q")

@@ -16,6 +16,9 @@ files = p.get_files()
 for x in files:
     if x.content_type == ContentType.CONTROL:
         print("found control nca:", x)
+        print("rights id:", x.rights_id)
+        print("key area:", x.key_area)
+
         print("parsing filesystems in nca...")
         for index, header in enumerate(x.fs_headers):
             print("index:", header.index)
@@ -23,6 +26,7 @@ for x in files:
             print("hash type:", header.hash_type)
             print("start_offset:", x.fs_entries[index].start_offset)
             print("end_offset:", x.fs_entries[index].end_offset)
+
         
 
 

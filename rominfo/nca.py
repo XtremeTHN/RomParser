@@ -1,7 +1,8 @@
 from fs.entry import PartitionEntry
 from readers import File, MemoryRegion, Region, EncryptedCtrRegion
 from fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType, HashType
-from fs.pfs0 import PFSItem
+from fs.pfs0 import PFSItem, PFS0
+from fs.romfs import Romfs
 from utils import media_to_bytes, bytes_default
 from enum import Enum
 from dataclasses import dataclass
@@ -209,23 +210,40 @@ class Nca(PFSItem):
         return [x for x in self.fs_entries if x.index == header.index][0]
     
     def open_fs(self, header: FsHeader):
+        def get_enc_region(offset, end_offset):
+            key = bytes.fromhex(self.key_area.aes_ctr_key)
+            return EncryptedCtrRegion(self, offset, end_offset, key, header.ctr)
+        
         entry = self.get_entry_for_header(header)
         
         if header.encryption_type != EncryptionType.AES_CTR:
             raise Exception("Only aes ctr encryption is supported", header.encryption_type)
         
-        if header.hash_type == HashType.HIERARCHICAL_INTEGRITY_HASH:
-            fs_offset = entry.start_offset + header.hash_data.info_level_hash.levels[-1].logical_offset
-            key = bytes.fromhex(self.key_area.aes_ctr_key)
-
-            print(header.ctr)
-            return EncryptedCtrRegion(self, fs_offset, entry.end_offset, key, header.ctr)
+        fs_offset = 0
+        match header.hash_type:
+            case HashType.HIERARCHICAL_INTEGRITY_HASH:
+                fs_offset = entry.start_offset + header.hash_data.info_level_hash.levels[-1].logical_offset
+            case HashType.HIERARCHICAL_SHA256_HASH:
+                fs_offset = entry.start_offset + header.hash_data.layer_regions[1].offset
+            case _:
+                raise Exception("invalid hash type")
+        
+        return get_enc_region(fs_offset, entry.end_offset)
 
         # TODO: decrypt
+    
+    def open_pfs(self, header: FsHeader):
+        if header.fs_type != FsType.PARTITION_FS:
+            raise InvalidFs(FsType.PARTITION_FS, header.fs_type)
+
+        fs = self.open_fs(header)
+        return PFS0(fs)
     
     def open_romfs(self, header: FsHeader):
         if header.fs_type != FsType.ROM_FS:
             raise InvalidFs(FsType.ROM_FS, header.fs_type)
+
+        return Romfs(self.open_fs(header))
         
     def get_key_generation(self) -> int:
         old = self.key_generation_old.value
@@ -236,8 +254,6 @@ class Nca(PFSItem):
 
     def handle_nca3(self, _header: bytes):
         self.decrypted_header = MemoryRegion(self.keyring.aes_xts_decrypt("header_key", _header, 0xC00, 0, 0x200))
-        open("out.bin", "wb").write(self.decrypted_header.source)
-
         header = self.decrypted_header
 
         self.distribution_type = DistributionType(int.from_bytes(header.read_at(0x204, 1)))

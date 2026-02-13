@@ -1,5 +1,5 @@
 from rom import Nsp
-from nca import ContentType
+from nca import ContentType, FsType
 from colorama import Fore, Style
 
 p = Nsp("undertale.nsp")
@@ -27,8 +27,9 @@ for x in files:
             print("start_offset:", x.fs_entries[index].start_offset)
             print("end_offset:", x.fs_entries[index].end_offset)
 
-        f = x.open_fs(x.fs_headers[0])
-
+        f = x.open_romfs(x.fs_headers[0])
+        print(f)
+        
 # print(file.content_type, file.content_size)
 
 # for x in file.fs_entries:

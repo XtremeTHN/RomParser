@@ -81,10 +81,16 @@ class Readable(IReadable):
 
     def read(self, size: int):
         return self.obj.read(size)
+    
+    # TODO: change this to read_to
+    def _read_to(self, size: int, format_str: str):
+        r = self.read(size)
+        return struct.unpack(format_str, r)[0]
 
     def read_at(self, offset: int, size: int):
         return self.obj.read_at(offset, size)
 
+    # TODO: change this to read_at_to
     def read_to(self, offset: int, size: int, format_string: str):
         return struct.unpack(format_string, self.read_at(offset, size))[0]
 
@@ -256,4 +262,4 @@ class EncryptedCtrRegion(Readable):
     def read_to(self, offset, size, format_string):
         self.seek(offset)
         d = self.read(size)
-        return struct.unpack(format_string, d)
+        return struct.unpack(format_string, d)[0]

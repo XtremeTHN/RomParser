@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from readers import MemoryRegion
 from abc import ABC, abstractmethod
 from utils import is_zeroes
+import struct
 
 @dataclass
 class FsEntry:
@@ -52,11 +53,32 @@ class MetaDataHashDataInfo:
         else:
             self.table_hash = hash
 
+@dataclass
+class LayerRegion:
+    offset: int
+    size: int
 
 @dataclass
 class HierarchicalSha256Data:
-    # TODO
-    ...
+    master_hash: bytes
+    block_size: int
+    layer_count = 2
+    layer_regions: list[LayerRegion]
+
+    def __init__(self, data: bytes):
+        r = MemoryRegion(data)
+
+        self.master_hash = r.read_at(0, 0x20)
+        self.block_size = r.read_to(0x20, 0x4, "<I")
+        self.layer_count = r.read_to(0x24, 0x4, "<I")
+        self.layer_regions = []
+
+        r.seek(0x28)
+        for x in range(self.layer_count):
+            offset = struct.unpack("<Q", r.read(0x8))[0]
+            size = struct.unpack("<Q", r.read(0x8))[0]
+            l = LayerRegion(offset, size)
+            self.layer_regions.append(l)
 
 @dataclass
 class HierarchicalIntegrityLevelInfo:
@@ -155,8 +177,7 @@ class FsHeader:
         if self.hash_type is HashType.HIERARCHICAL_INTEGRITY_HASH:
             self.hash_data = HierarchicalIntegrity(hash_data)
         else:
-            # raise NotImplementedError("not a hierarchical hash")
-            self.hash_data = HierarchicalSha256Data()
+            self.hash_data = HierarchicalSha256Data(hash_data)
 
     def i(self, en, v):
         return en(int.from_bytes(v))

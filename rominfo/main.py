@@ -2,33 +2,49 @@ from rom import Nsp
 from nca import ContentType, FsType
 from colorama import Fore, Style
 
-p = Nsp("undertale.nsp")
-p.populate_attrs()
+def color(string, color):
+    return color + string + Fore.RESET
 
-print(
-    "partition_entry_count:", p.partition_entry_count,
-    "string_table_size:", p.string_table_size,
-    "reserved:", p.reserved
-)
+def colored(*msg, color=Fore.GREEN, level=""):
+    print(color + Style.BRIGHT + str(level) + Style.RESET_ALL, *msg)
+
+def color_ctx(prefix):
+    def wrapper(*msg, color=Fore.GREEN, level=""):
+        colored(*msg, color=color, level=str(prefix) + str(level))
+
+    return wrapper         
+
+def info(*msg):
+    colored(*msg, level="INFO")
+
+FILE = "undertale.nsp"
+
+info("parsing", color(FILE, Fore.CYAN))
+p = Nsp(FILE)
+p.populate_attrs()
 
 files = p.get_files()
 
+print("-" * 50)
 for x in files:
-    if x.content_type == ContentType.CONTROL:
-        print("found control nca:", x)
-        print("rights id:", x.rights_id)
-        print("key area:", x.key_area)
+    info("nca:", x.name)
+    info("rights id:", x.rights_id)
+    if hasattr(x, "key_area"):
+        info("key area:", x.key_area)
 
-        print("parsing filesystems in nca...")
-        for index, header in enumerate(x.fs_headers):
-            print("index:", header.index)
-            print("filesystem:", header.fs_type)
-            print("hash type:", header.hash_type)
-            print("start_offset:", x.fs_entries[index].start_offset)
-            print("end_offset:", x.fs_entries[index].end_offset)
+    info("parsing filesystems in nca...\n")
 
-        f = x.open_romfs(x.fs_headers[0])
-        print(f)
+    c = color_ctx("Header ")
+    for index, header in enumerate(x.fs_headers):
+        c("filesystem:", header.fs_type, level=header.index)
+        c("hash type:", header.hash_type, level=header.index)
+        c("start_offset:", x.fs_entries[index].start_offset, level=header.index)
+        c("end_offset:", x.fs_entries[index].end_offset, level=header.index)
+        print()
+
+    print("-" * 50)
+        # f = x.open_romfs(x.fs_headers[0])
+        # colored(f, level=header.index)
         
 # print(file.content_type, file.content_size)
 

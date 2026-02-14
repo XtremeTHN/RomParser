@@ -2,7 +2,7 @@ from fs.entry import PartitionEntry
 from readers import File, MemoryRegion, Region, EncryptedCtrRegion
 from fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType, HashType
 from fs.pfs0 import PFSItem, PFS0
-from fs.romfs import Romfs
+from fs.romfs import RomFS
 from utils import media_to_bytes, bytes_default
 from enum import Enum
 from dataclasses import dataclass
@@ -241,7 +241,7 @@ class Nca(PFSItem):
         if header.fs_type != FsType.ROM_FS:
             raise InvalidFs(FsType.ROM_FS, header.fs_type)
 
-        return Romfs(self.open_fs(header))
+        return RomFS(self.open_fs(header))
         
     def get_key_generation(self) -> int:
         old = self.key_generation_old.value

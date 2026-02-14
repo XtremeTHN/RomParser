@@ -95,6 +95,7 @@ class Readable(IReadable):
         return struct.unpack(format_string, self.read_at(offset, size))[0]
 
     def dump(self, path):
+        self.seek(0)
         with open(path, "wb") as f:
             while True:
                 chunk = self.read(1024)
@@ -135,7 +136,9 @@ class MemoryRegion(IReadable):
         self.pos += size
 
         return bytes(res)
-
+    def _read_to(self, size: int, format_str: str):
+        r = self.read(size)
+        return struct.unpack(format_str, r)[0]
     def read_at(self, offset, size):
         return self.source[offset:offset + size]
     
@@ -146,6 +149,7 @@ class MemoryRegion(IReadable):
         return len(self.source)
 
     def dump(self, path):
+        self.seek(0)
         with open(path, "wb") as f:
             f.write(self.source)
 
@@ -181,6 +185,7 @@ class Region(Readable):
 
         total_offset = self.offset + offset
         if (total_offset > self.end):
+            return total_offset
             raise OutOfBounds(f"total_offset: {total_offset} end: {self.end} self.offset: {self.offset}")
         return total_offset
 
@@ -207,6 +212,8 @@ class EncryptedCtrRegion(Readable):
     def __init__(self, source: Region, offset: int, end: int, key: bytes, ctr: int):
         super().__init__(source)
 
+        
+        self.start = offset
         self.offset = offset
         self.end = end
 
@@ -254,6 +261,15 @@ class EncryptedCtrRegion(Readable):
         self.offset += len(result)
 
         return result
+
+    def calc_offset(self, offset):
+        _offset = self.start + offset
+        if _offset > self.end:
+            raise OutOfBounds()
+        return _offset
+
+    def seek(self, offset):
+        self.offset = self.calc_offset(offset)
     
     def read_at(self, offset, size):
         self.seek(offset)

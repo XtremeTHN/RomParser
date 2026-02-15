@@ -11,7 +11,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      python = (pkgs.python314.withPackages (ps: with ps; [
+      python = (pkgs.python313.withPackages (ps: with ps; [
         colorama
         cryptography
         hatchling

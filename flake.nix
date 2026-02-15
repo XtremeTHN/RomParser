@@ -37,9 +37,17 @@
         version = "0.1.0";
         src = ./.;
         
-        pyproject = true;
+        format = "pyproject";
 
-        inherit buildInputs;
+        nativeBuildInputs = with python.pkgs; [
+          hatchling
+        ];
+
+        propagatedBuildInputs = with python.pkgs; [
+          cryptography
+        ];
+
+        pythonImportsCheck = [ "nxroms" ];
       };
     };
 }

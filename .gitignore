@@ -3,3 +3,4 @@ out*
 __pycache__
 .direnv
 *.bin
+.ruff_cache

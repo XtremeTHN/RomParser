@@ -5,3 +5,4 @@ __pycache__
 *.bin
 .ruff_cache
 .venv
+result

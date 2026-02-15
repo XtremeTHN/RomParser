@@ -107,8 +107,11 @@ class Readable(IReadable):
 class File(Readable):
     obj: BufferedReader
 
-    def __init__(self, file: str):
-        super().__init__(open(file, "rb"))
+    def __init__(self, file: str | BufferedReader):
+        if isinstance(file, str):
+            super().__init__(open(file, "rb"))
+        else:
+            super().__init__(file)
 
     def fileno(self) -> int:
         return self.obj.fileno()

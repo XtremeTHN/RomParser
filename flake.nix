@@ -11,20 +11,10 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      python = (pkgs.python313.withPackages (ps: with ps; [
-        colorama
-        cryptography
-        hatchling
-      ]));
-      
-
-      buildInputs = [
-        python
-      ];
+      python = pkgs.python313;
     in
     {
       devShells.${system}.default = pkgs.mkShell {
-        inherit buildInputs;
         packages = with pkgs; [
           ruff
           hactool

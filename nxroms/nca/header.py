@@ -22,36 +22,6 @@ class KeyArea:
         self.unk_key = r.read(0x10).hex()
 
 
-class KeyGeneration(Enum):
-    _3_0_1 = 0x03
-    _4_0_0 = 0x04
-    _5_0_0 = 0x05
-    _6_0_0 = 0x06
-    _6_2_0 = 0x07
-    _7_0_0 = 0x08
-    _8_1_0 = 0x09
-    _9_0_0 = 0x0A
-    _9_1_0 = 0x0B
-    _12_1_0 = 0x0C
-    _13_0_0 = 0x0D
-    _14_0_0 = 0x0E
-    _15_0_0 = 0x0F
-    _16_0_0 = 0x10
-    _17_0_0 = 0x11
-    _18_0_0 = 0x12
-    _19_0_0 = 0x13
-    _20_0_0 = 0x14
-    _21_0_0 = 0x15
-    INVALID = 0xFF
-
-    @classmethod
-    def from_data(cls, data):
-        try:
-            return cls(data)
-        except ValueError:
-            return cls.INVALID
-
-
 class KeyAreaEncryptionKeyIndex(Enum):
     APPLICATION = 0x00
     OCEAN = 0x01
@@ -92,7 +62,7 @@ class NcaHeader(Readable):
     program_id: int
     content_index: int
     sdk_addon_version: str
-    key_generation: KeyGeneration
+    key_generation: int
     rights_id: str
 
     magic: str
@@ -139,7 +109,7 @@ class NcaHeader(Readable):
         self.program_id = header._read_to(0x8, "<Q")
         self.content_index = header._read_to(0x4, "<I")
         sdk_ver_bytes = header.read(0x4)
-        self.key_generation = KeyGeneration(header.read_at(0x220, 0x1)[0])
+        self.key_generation = header.read_at(0x220, 0x1)[0]
 
         self.rights_id = bytes_default(header.read_at(0x230, 0x10))
 
@@ -177,7 +147,7 @@ class NcaHeader(Readable):
 
     def get_key_generation(self) -> int:
         old = self.key_generation_old.value
-        new = self.key_generation.value
+        new = self.key_generation
 
         key = new if old < new else old
         return key - 1 if key > 0 else key

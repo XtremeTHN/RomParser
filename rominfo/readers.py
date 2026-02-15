@@ -1,4 +1,3 @@
-import mmap
 import struct
 from typing import Any
 from io import BufferedReader

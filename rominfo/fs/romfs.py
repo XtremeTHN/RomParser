@@ -1,6 +1,5 @@
 from ..readers import IReadable, Region, MemoryRegion
 from dataclasses import dataclass
-import struct
 
 @dataclass
 class RomFSHeader:

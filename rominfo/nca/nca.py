@@ -1,23 +1,14 @@
 from ..fs.entry import PartitionEntry
-from ..readers import File, MemoryRegion, EncryptedCtrRegion
-from ..fs.fs import FsEntry, FsHeader, FsType, InvalidFs, EncryptionType, HashType
+from ..readers import File, EncryptedCtrRegion
+from ..fs.fs import FsHeader, FsType, InvalidFs, EncryptionType, HashType
 from ..fs.pfs0 import PFSItem, PFS0
 from ..fs.romfs import RomFS
-from ..utils import media_to_bytes, bytes_default, is_zeroes
 
 from .header import (
-    DistributionType,
-    ContentType,
-    KeyGenOld,
-    KeyAreaEncryptionKeyIndex,
-    KeyGeneration,
-    KeyArea,
     NcaHeader,
 )
-from ..keys import Keyring, modes
-import struct
+from ..keys import Keyring
 
-from . import NCA_ENCRYPTED_SIZE, NCA_HEADER_SECTION_SIZE, NCA_HEADER_SIZE
 
 
 class Nca(PFSItem):

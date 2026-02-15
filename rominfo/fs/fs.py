@@ -1,9 +1,9 @@
 from enum import Enum
 from dataclasses import dataclass
 from ..readers import MemoryRegion
-from abc import ABC, abstractmethod
 from ..utils import is_zeroes
 import struct
+
 
 @dataclass
 class FsEntry:
@@ -12,27 +12,31 @@ class FsEntry:
     index: int
     reserved: None = None
 
+
 class FsType(Enum):
-    ROM_FS=0
-    PARTITION_FS=1
+    ROM_FS = 0
+    PARTITION_FS = 1
+
 
 class HashType(Enum):
-    AUTO=0
-    HIERARCHICAL_SHA256_HASH=2
-    HIERARCHICAL_INTEGRITY_HASH=3
+    AUTO = 0
+    HIERARCHICAL_SHA256_HASH = 2
+    HIERARCHICAL_INTEGRITY_HASH = 3
+
 
 class EncryptionType(Enum):
-    AUTO=0
-    NONE=1
-    AES_XTS=2
-    AES_CTR=3
-    AES_CTR_EX=4
-    AES_CTR_SKIP_LAYER_HASH=5
-    AES_CTR_EX_SKIP_LAYER_HASH=6
+    AUTO = 0
+    NONE = 1
+    AES_XTS = 2
+    AES_CTR = 3
+    AES_CTR_EX = 4
+    AES_CTR_SKIP_LAYER_HASH = 5
+    AES_CTR_EX_SKIP_LAYER_HASH = 6
+
 
 class MetaDataHashType(Enum):
-    NONE=0
-    HIERARCHICAL_INTEGRITY=1
+    NONE = 0
+    HIERARCHICAL_INTEGRITY = 1
 
 
 @dataclass
@@ -46,17 +50,19 @@ class MetaDataHashDataInfo:
 
         self.table_offset = r.read_to(0, 0x8, "<Q")
         self.table_size = r.read_to(0x8, 0x8, "<Q")
-        
+
         hash = r.read_at(0x10, 0x20)
         if not any(hash):
             self.table_hash = None
         else:
             self.table_hash = hash
 
+
 @dataclass
 class LayerRegion:
     offset: int
     size: int
+
 
 @dataclass
 class HierarchicalSha256Data:
@@ -77,8 +83,9 @@ class HierarchicalSha256Data:
         for x in range(self.layer_count):
             offset = struct.unpack("<Q", r.read(0x8))[0]
             size = struct.unpack("<Q", r.read(0x8))[0]
-            l = LayerRegion(offset, size)
-            self.layer_regions.append(l)
+            layer = LayerRegion(offset, size)
+            self.layer_regions.append(layer)
+
 
 @dataclass
 class HierarchicalIntegrityLevelInfo:
@@ -86,6 +93,7 @@ class HierarchicalIntegrityLevelInfo:
     size: int
     block_size_log2: int
     reserved = None
+
 
 # TODO: if the romfs is invalid, check this class
 # the levels data are rare
@@ -118,15 +126,14 @@ class InfoLevelHash:
         r.seek(0x4)
         for x in range(6):
             data = r.read(0x18)
-            self.levels.append(
-                HierarchicalIntegrityLevel(data)
-            )
-        
+            self.levels.append(HierarchicalIntegrityLevel(data))
+
         salt = r.read_at(0x94, 0x20)
         if is_zeroes(salt):
             self.salt = None
         else:
             self.salt = salt
+
 
 @dataclass
 class HierarchicalIntegrity:
@@ -143,9 +150,8 @@ class HierarchicalIntegrity:
 
         self.version = r.read_to(0x4, 0x4, "<I")
         self.master_hash_size = r.read_to(0x8, 0x4, "<I")
-        self.info_level_hash = InfoLevelHash(
-            r.read_at(0xC, 0xB4)
-        )
+        self.info_level_hash = InfoLevelHash(r.read_at(0xC, 0xB4))
+
 
 @dataclass
 class FsHeader:
@@ -165,9 +171,9 @@ class FsHeader:
         r = MemoryRegion(data)
         self.index = index
 
-        self.fs_type = self.i(FsType, r.read_at(0x2,0x1))
-        self.hash_type = self.i(HashType, r.read_at(0x3,0x1))
-        self.encryption_type = self.i(EncryptionType, r.read_at(0x4,0x1))
+        self.fs_type = self.i(FsType, r.read_at(0x2, 0x1))
+        self.hash_type = self.i(HashType, r.read_at(0x3, 0x1))
+        self.encryption_type = self.i(EncryptionType, r.read_at(0x4, 0x1))
 
         self.meta_hash_type = self.i(MetaDataHashType, r.read_at(0x5, 0x1))
         self.meta_hash_data_info = MetaDataHashDataInfo(r.read_at(0x1A0, 0x30))
@@ -181,6 +187,7 @@ class FsHeader:
 
     def i(self, en, v):
         return en(int.from_bytes(v))
+
 
 class InvalidFs(Exception):
     def __init__(self, expected, given):

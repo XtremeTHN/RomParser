@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from ..readers import MemoryRegion, Readable
 from ..fs.fs import FsEntry, FsHeader
 from ..keys import Keyring, modes
-from . import NCA_ENCRYPTED_SIZE, NCA_HEADER_SECTION_SIZE, NCA_HEADER_SIZE
+from . import NCA_HEADER_SECTION_SIZE, NCA_HEADER_SIZE
 import struct
 from ..utils import media_to_bytes, is_zeroes, bytes_default
 

@@ -9,7 +9,11 @@ T = TypeVar("Keyring")
 PROD_KEYS_PATH = Path.home() / ".switch/prod.keys"
 
 
-class KeysError(Exception):
+class KeysNotFound(Exception):
+    pass
+
+
+class InvalidKeys(Exception):
     pass
 
 
@@ -26,12 +30,12 @@ class Keyring:
             self.key_file = open(key_path, "r")
         else:
             if PROD_KEYS_PATH.exists() is False:
-                raise KeyError(
+                raise KeysNotFound(
                     "Put your keys in ~/.switch/prod.keys before using this project"
                 )
 
             if PROD_KEYS_PATH.isfile() is False:
-                raise KeyError("Invalid keys")
+                raise InvalidKeys("Invalid keys")
 
             self.key_file = PROD_KEYS_PATH.open()
 

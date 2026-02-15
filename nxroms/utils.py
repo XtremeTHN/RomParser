@@ -8,3 +8,7 @@ def is_zeroes(data: bytes):
 
 def bytes_default(data: bytes, default=None):
     return default if is_zeroes(data) else data
+
+
+def strip(string: bytes) -> str:
+    return string.replace(b"\x00", b"").decode()

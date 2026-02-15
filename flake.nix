@@ -19,6 +19,7 @@
           ruff
           hactool
           ghex
+          (python313.withPackages (ps: with ps; [cryptography colorama]))
         ];
       };
 

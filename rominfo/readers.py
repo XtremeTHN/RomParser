@@ -4,12 +4,13 @@ from io import BufferedReader
 from abc import ABC, abstractmethod
 from .keys import Keyring, modes
 
+
 class IReadable(ABC):
     @abstractmethod
     def tell(self) -> int:
         """
         Gets the cursor position
-        
+
         Returns:
             int: The cursor position
         """
@@ -19,12 +20,12 @@ class IReadable(ABC):
     def seek(self, offset: int) -> None:
         """
         Moves the cursor to offset
-        
+
         Args:
             offset (int): The cursor position
         """
         ...
-    
+
     @abstractmethod
     def read(self, size: int) -> bytes | None:
         """
@@ -37,7 +38,7 @@ class IReadable(ABC):
             bytes | None: The bytes read from the source, or None if no more data is available.
         """
         ...
-    
+
     @abstractmethod
     def read_at(self, offset: int, size: int) -> bytes:
         """
@@ -51,7 +52,7 @@ class IReadable(ABC):
             bytes: The bytes read from the specified offset and size.
         """
         ...
-    
+
     @abstractmethod
     def read_to(self, offset: int, size: int, format_string: str) -> Any:
         """
@@ -63,15 +64,15 @@ class IReadable(ABC):
             format_string (str): The struct.unpack format string
         """
         ...
-    
+
     @abstractmethod
-    def dump(self, path):
-        ...
+    def dump(self, path): ...
+
 
 class Readable(IReadable):
     def __init__(self, obj: IReadable):
         self.obj = obj
-    
+
     def seek(self, offset: int):
         self.obj.seek(offset)
 
@@ -80,7 +81,7 @@ class Readable(IReadable):
 
     def read(self, size: int):
         return self.obj.read(size)
-    
+
     # TODO: change this to read_to
     def _read_to(self, size: int, format_str: str):
         r = self.read(size)
@@ -102,12 +103,13 @@ class Readable(IReadable):
                     break
                 f.write(chunk)
 
+
 class File(Readable):
     obj: BufferedReader
 
     def __init__(self, file: str):
         super().__init__(open(file, "rb"))
-    
+
     def fileno(self) -> int:
         return self.obj.fileno()
 
@@ -116,8 +118,8 @@ class File(Readable):
         return self.obj.read(size)
 
 
-class OutOfBounds(Exception):
-    ...
+class OutOfBounds(Exception): ...
+
 
 class MemoryRegion(IReadable):
     def __init__(self, source: bytearray):
@@ -131,16 +133,18 @@ class MemoryRegion(IReadable):
         self.pos = pos
 
     def read(self, size):
-        res = self.source[self.pos:self.pos + size]
+        res = self.source[self.pos : self.pos + size]
         self.pos += size
 
         return bytes(res)
+
     def _read_to(self, size: int, format_str: str):
         r = self.read(size)
         return struct.unpack(format_str, r)[0]
+
     def read_at(self, offset, size):
-        return self.source[offset:offset + size]
-    
+        return self.source[offset : offset + size]
+
     def read_to(self, offset, size, format_str):
         return struct.unpack(format_str, self.read_at(offset, size))[0]
 
@@ -152,11 +156,12 @@ class MemoryRegion(IReadable):
         with open(path, "wb") as f:
             f.write(self.source)
 
+
 class Region(Readable):
     def __init__(self, source: IReadable, offset: int, end: int):
         """
         A region of a source
-        
+
         Args:
             source (IReadable): An object that implements IReadable
             offset (int): The start of the region
@@ -164,33 +169,35 @@ class Region(Readable):
         """
 
         super().__init__(source)
-        
+
         self.offset = offset
         self.end = end
 
     def calc_offset(self, offset: int):
         """
         Calculate the total offset by adding the provided offset to the instance's base offset.
-        
+
         Args:
             offset (int): The offset value to add to the base offset
-        
+
         Returns:
             int: The calculated offset
-        
+
         Raises:
             OutOfBounds: If the offset is larger than self.end
         """
 
         total_offset = self.offset + offset
-        if (total_offset > self.end):
+        if total_offset > self.end:
             return total_offset
-            raise OutOfBounds(f"total_offset: {total_offset} end: {self.end} self.offset: {self.offset}")
+            raise OutOfBounds(
+                f"total_offset: {total_offset} end: {self.end} self.offset: {self.offset}"
+            )
         return total_offset
 
     def seek(self, offset):
         super().seek(self.calc_offset(offset))
-    
+
     def read(self, size: int):
         current_pos = self.obj.tell() - self.offset
         remaining_bytes = self.end - current_pos
@@ -200,30 +207,30 @@ class Region(Readable):
 
         read_size = min(size, remaining_bytes)
         return super().read(read_size)
-    
+
     def read_at(self, offset, size):
         return super().read_at(self.calc_offset(offset), size)
 
     def read_to(self, offset, size, format_string):
         return super().read_to(self.calc_offset(offset), size, format_string)
 
+
 class EncryptedCtrRegion(Readable):
     def __init__(self, source: Region, offset: int, end: int, key: bytes, ctr: int):
         super().__init__(source)
 
-        
         self.start = offset
         self.offset = offset
         self.end = end
 
         self.key = key
         self.ctr = ctr
-    
+
     def align_down(self, value: int, align: int):
         return value & ~(align - 1)
 
     def align_up(self, value: int, align: int):
-        return (value + (align -1)) & ~(align - 1)
+        return (value + (align - 1)) & ~(align - 1)
 
     # im not gonna refactor this
     def read(self, size):
@@ -245,8 +252,7 @@ class EncryptedCtrRegion(Readable):
         if not data:
             return b""
 
-        sector_index = ((aligned_offset >> 4) |
-                        (self.ctr << 64))
+        sector_index = (aligned_offset >> 4) | (self.ctr << 64)
         iv = Keyring.get_tweak(sector_index)
 
         decryptor = Keyring.get_decryptor(self.key, modes.CTR(iv))
@@ -269,7 +275,7 @@ class EncryptedCtrRegion(Readable):
 
     def seek(self, offset):
         self.offset = self.calc_offset(offset)
-    
+
     def read_at(self, offset, size):
         self.seek(offset)
         return self.read(size)

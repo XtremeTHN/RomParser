@@ -1,6 +1,7 @@
 from ..readers import IReadable, Region, MemoryRegion
 from dataclasses import dataclass
 
+
 @dataclass
 class RomFSHeader:
     header_size: int
@@ -28,6 +29,7 @@ class RomFSHeader:
         self.file_meta_table_size = f._read_to(0x8, "<Q")
         self.data_offset = f._read_to(0x8, "<Q")
 
+
 @dataclass
 class RomFSEntry:
     parent: int
@@ -50,6 +52,7 @@ class RomFSEntry:
         self.name_size = m._read_to(0x4, "<I")
         self.name = m.read(self.name_size).decode()
 
+
 @dataclass
 class RomFSFile(RomFSEntry):
     offset: int
@@ -61,6 +64,7 @@ class RomFSFile(RomFSEntry):
         self.offset = m.read_to(0x8, 0x8, "<Q")
         self.size = m.read_to(0x10, 0x8, "<Q")
 
+
 @dataclass
 class RomFSDirectory(RomFSEntry):
     child: int
@@ -71,6 +75,7 @@ class RomFSDirectory(RomFSEntry):
 
         self.child = m.read_to(0x8, 0x4, "<I")
         self.file = m.read_to(0xC, 0x4, "<I")
+
 
 # TODO: implement directory opening
 @dataclass
@@ -86,14 +91,14 @@ class RomFS:
         self.files = []
 
         self.populate_files()
-    
+
     def populate_files(self):
         sibling = 0
         while True:
             d = MemoryRegion(
                 self.source.read_at(
                     self.header.file_meta_table_offset + sibling,
-                    self.header.file_meta_table_size - sibling
+                    self.header.file_meta_table_size - sibling,
                 )
             )
             f = RomFSFile(d)
@@ -107,7 +112,5 @@ class RomFS:
     def get_file(self, file: RomFSFile) -> Region:
         data = self.source.read_at(self.header.data_offset + file.offset, file.size)
         return MemoryRegion(data)
-    
-    def populate(self):
-        ...
 
+    def populate(self): ...

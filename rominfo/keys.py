@@ -5,6 +5,7 @@ from io import BufferedReader
 
 T = TypeVar("Keyring")
 
+
 class Keyring:
     _instance: T = None
 
@@ -20,7 +21,7 @@ class Keyring:
             self.key_file = open(os.path.expanduser("~/.switch/prod.keys"), "r")
 
         self.prod = self.parse(self.key_file)
-    
+
     def parse(self, file: BufferedReader):
         res = {}
 
@@ -40,7 +41,7 @@ class Keyring:
                 continue
 
             res[key.strip()] = val.strip()
-        
+
         return res
 
     @classmethod
@@ -64,7 +65,7 @@ class Keyring:
     @staticmethod
     def get_tweak(sector: int) -> bytes:
         return int.to_bytes(sector, length=16, byteorder="big")
-    
+
     def aes_xts_decrypt(
         self,
         key: str,
@@ -85,7 +86,7 @@ class Keyring:
             dst += self.aes_decrypt(
                 src[offset : offset + sector_size],
                 bytes.fromhex(self.prod[key]),
-                modes.XTS(tweak)
+                modes.XTS(tweak),
             )
 
         return dst

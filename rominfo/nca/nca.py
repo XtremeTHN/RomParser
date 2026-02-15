@@ -10,7 +10,6 @@ from .header import (
 from ..keys import Keyring
 
 
-
 class Nca(PFSItem):
     name: str
     entry: PartitionEntry

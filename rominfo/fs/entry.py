@@ -1,5 +1,6 @@
 import struct
 
+
 class PartitionEntry:
     offset: int
     size: int
@@ -7,4 +8,6 @@ class PartitionEntry:
     reserved: int
 
     def __init__(self, data: bytes):
-        self.offset, self.size, self.string_offset, self.reserved = struct.unpack("<QQII", data)
+        self.offset, self.size, self.string_offset, self.reserved = struct.unpack(
+            "<QQII", data
+        )

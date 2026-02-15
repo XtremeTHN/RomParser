@@ -14,21 +14,17 @@
       python = (pkgs.python314.withPackages (ps: with ps; [
         colorama
         cryptography
+        hatchling
       ]));
       
-      nativeBuildInputs = with pkgs; [
-        meson
-        ninja
-      ];
 
-      buildInputs = with pkgs; [
+      buildInputs = [
         python
-        hatch
       ];
     in
     {
       devShells.${system}.default = pkgs.mkShell {
-        inherit nativeBuildInputs buildInputs;
+        inherit buildInputs;
         packages = with pkgs; [
           ruff
           hactool
@@ -36,13 +32,14 @@
         ];
       };
 
-      packages.${system}.default = pkgs.stdenv.mkDerivation {
-        name = "svgtheme";
+      packages.${system}.default = python.pkgs.buildPythonPackage {
+        pname = "nxroms";
         version = "0.1.0";
         src = ./.;
+        
+        pyproject = true;
 
-
-        inherit nativeBuildInputs buildInputs;
+        inherit buildInputs;
       };
     };
 }

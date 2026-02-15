@@ -1,9 +1,16 @@
 from typing import TypeVar
-import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from io import BufferedReader
 
+from pathlib import Path
+
 T = TypeVar("Keyring")
+
+PROD_KEYS_PATH = Path.home() / ".switch/prod.keys"
+
+
+class KeysError(Exception):
+    pass
 
 
 class Keyring:
@@ -18,7 +25,15 @@ class Keyring:
         if key_path:
             self.key_file = open(key_path, "r")
         else:
-            self.key_file = open(os.path.expanduser("~/.switch/prod.keys"), "r")
+            if PROD_KEYS_PATH.exists() is False:
+                raise KeyError(
+                    "Put your keys in ~/.switch/prod.keys before using this project"
+                )
+
+            if PROD_KEYS_PATH.isfile() is False:
+                raise KeyError("Invalid keys")
+
+            self.key_file = PROD_KEYS_PATH.open()
 
         self.prod = self.parse(self.key_file)
 

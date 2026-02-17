@@ -27,7 +27,14 @@ class IReadable(ABC):
         ...
 
     @abstractmethod
-    def skip(self, bytes: int) -> Any: ...
+    def skip(self, bytes: int) -> Any:
+        """
+        Skips a count of `bytes` from the current position
+
+        Args:
+            bytes (int): Count of bytes to skip
+        """
+        ...
 
     @abstractmethod
     def read(self, size: int) -> bytes | None:
@@ -57,8 +64,20 @@ class IReadable(ABC):
         ...
 
     @abstractmethod
-    def read_unpack(self, size: int, format_string: str) -> Any: ...
+    def read_unpack(self, size: int, format_string: str) -> Any:
+        """
+        Reads up to `size` bytes from the source and unpacks it to `format_string`
 
+        Args:
+            size (int): The maximum number of bytes to read.
+            format_string (str): The struct.unpack format string
+
+        Returns:
+            Any | None: The unpacked data. None if theres no more data to read.
+        """
+        ...
+
+    # TODO: change name to read_unpack_at
     @abstractmethod
     def read_to(self, offset: int, size: int, format_string: str) -> Any:
         """
@@ -72,11 +91,24 @@ class IReadable(ABC):
         ...
 
     @abstractmethod
-    def dump(self, path): ...
+    def dump(self, path):
+        """
+        Writes all the data of this `IReadable` into `path`
+
+        Args:
+            path (str): The destination path
+        """
+        ...
 
 
 class Readable(IReadable):
     def __init__(self, obj: IReadable):
+        """
+        A wrapper of an `IReadable`
+
+        Args:
+            obj (IReadable): An object implementing the mayority of methods of IReadable
+        """
         self.obj = obj
 
     def seek(self, offset: int):
@@ -98,7 +130,7 @@ class Readable(IReadable):
 
         return struct.unpack(format_str, d)[0]
 
-    # TODO: change this to read_to
+    # TODO: change this to read_unpack
     def _read_to(self, size: int, format_str: str):
         r = self.read(size)
         return struct.unpack(format_str, r)[0]
@@ -106,7 +138,7 @@ class Readable(IReadable):
     def read_at(self, offset: int, size: int):
         return self.obj.read_at(offset, size)
 
-    # TODO: change this to read_at_to
+    # TODO: change name to read_unpack_at
     def read_to(self, offset: int, size: int, format_string: str):
         return struct.unpack(format_string, self.read_at(offset, size))[0]
 
@@ -136,12 +168,18 @@ class File(Readable):
         self.seek(offset)
         return self.obj.read(size)
 
+    def close(self):
+        self.obj.close()
+
 
 class OutOfBounds(Exception): ...
 
 
 class MemoryRegion(IReadable):
     def __init__(self, source: bytearray):
+        """
+        A readable bytes buffer
+        """
         self.source = source
         self.pos = 0
 
@@ -245,6 +283,16 @@ class Region(Readable):
 
 class EncryptedCtrRegion(Readable):
     def __init__(self, source: Region, offset: int, end: int, key: bytes, ctr: int):
+        """
+        A region with a ctr encryption
+
+        Args:
+            source (Region): The source
+            offset (int): The start of the encryted data
+            end (int): The end of the encrypted data
+            key (bytes): The AES Ctr key in bytes
+            ctr (int): The ctr of the header
+        """
         super().__init__(source)
 
         self.start = offset

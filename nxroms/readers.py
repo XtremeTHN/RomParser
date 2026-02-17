@@ -27,6 +27,9 @@ class IReadable(ABC):
         ...
 
     @abstractmethod
+    def skip(self, bytes: int) -> Any: ...
+
+    @abstractmethod
     def read(self, size: int) -> bytes | None:
         """
         Reads up to `size` bytes from the source.
@@ -54,6 +57,9 @@ class IReadable(ABC):
         ...
 
     @abstractmethod
+    def read_unpack(self, size: int, format_string: str) -> Any: ...
+
+    @abstractmethod
     def read_to(self, offset: int, size: int, format_string: str) -> Any:
         """
         Reads a sequence of bytes from the given offset and converts it to format_string
@@ -76,11 +82,21 @@ class Readable(IReadable):
     def seek(self, offset: int):
         self.obj.seek(offset)
 
+    def skip(self, bytes: int):
+        self.seek(self.obj.tell() + bytes)
+
     def tell(self) -> int:
         return self.obj.tell()
 
     def read(self, size: int):
         return self.obj.read(size)
+
+    def read_unpack(self, size: int, format_str: int):
+        d = self.read(size)
+        if not d:
+            return
+
+        return struct.unpack(format_str, d)[0]
 
     # TODO: change this to read_to
     def _read_to(self, size: int, format_str: str):
@@ -135,12 +151,20 @@ class MemoryRegion(IReadable):
     def seek(self, pos):
         self.pos = pos
 
+    def skip(self, bytes: int):
+        self.seek(self.obj.tell() + bytes)
+
     def read(self, size):
         res = self.source[self.pos : self.pos + size]
         self.pos += size
 
         return bytes(res)
 
+    # TODO: implement
+    def read_unpack(self, size, format_string):
+        return self._read_to(size, format_string)
+
+    # TODO: remove
     def _read_to(self, size: int, format_str: str):
         r = self.read(size)
         return struct.unpack(format_str, r)[0]
@@ -148,6 +172,7 @@ class MemoryRegion(IReadable):
     def read_at(self, offset, size):
         return self.source[offset : offset + size]
 
+    # TODO: change name to read_unpack_at
     def read_to(self, offset, size, format_str):
         return struct.unpack(format_str, self.read_at(offset, size))[0]
 

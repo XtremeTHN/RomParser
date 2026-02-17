@@ -1,4 +1,5 @@
-from nxroms.rom import Nsp
+from nxroms.rom.nsp import Nsp
+from nxroms.rom.xci import Xci
 from nxroms.fs.fs import FsType
 from nxroms.nca.header import ContentType
 from colorama import Fore, Style
@@ -39,7 +40,7 @@ def print_nca_filesystems(nca):
 
 
 def print_nca_info(nca):
-    info("nca:", nca.name)
+    info("nca:", nca.entry.name)
     info("rights id:", nca.header.rights_id)
     if hasattr(nca, "key_area"):
         info("key area:", nca.header.key_area)
@@ -82,10 +83,20 @@ def control_nca(rom: Nsp):
         info("control nca not found")
 
 
+def parse_nsp(f):
+    p = Nsp(f)
+
+    control_nca(p)
+
+
+def parse_xci(f):
+    x = Xci(f)
+
+    info(x.header)
+
+
 FILE = sys.argv[1]
 
 info("parsing", color(FILE, Fore.CYAN))
-p = Nsp(FILE)
-p.populate_attrs()
-
-control_nca(p)
+# parse_xci(FILE)
+parse_nsp(FILE)

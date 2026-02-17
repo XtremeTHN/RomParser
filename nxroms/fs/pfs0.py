@@ -1,5 +1,6 @@
 from ..fs.entry import PartitionEntry
 from ..readers import File, Region, IReadable
+from dataclasses import dataclass
 
 
 class FsEntry:
@@ -12,69 +13,76 @@ class NotAPFS0(Exception):
     pass
 
 
-class PFSItem(Region):
+@dataclass
+class PFSEntry:
+    offset: int
+    size: int
     name: str
+
+
+@dataclass
+class PFSHeader:
+    magic: str
+    file_count: int
+    string_table_size: int
+    file_entry_table: list
+    string_table: bytes
+    raw_data_pos: int
+
+    def __init__(self, obj: IReadable, magic: bytes, entry_size: int):
+        self.obj = obj
+
+        if (n := self.obj.read(4)) != magic:
+            raise NotAPFS0(f"invalid magic: {n}")
+
+        self.file_count = obj.read_to(0x4, 0x4, "<I")
+        self.string_table_size = obj.read_to(0x8, 0x4, "<I")
+        self.file_entry_table = []
+
+        self.entry_size = entry_size
+        str_table_offset = 0x10 + entry_size * self.file_count
+        self.string_table = obj.read_at(str_table_offset, self.string_table_size)
+        self.raw_data_pos = str_table_offset + self.string_table_size
+
+        self.populate_entries()
+
+    def populate_entries(self):
+        self.obj.seek(0x10)
+        for _ in range(self.file_count):
+            offset = self.obj.read_unpack(0x8, "<Q")
+            size = self.obj.read_unpack(0x8, "<Q")
+            name_offset = self.obj.read_unpack(0x4, "<I")
+            name = self.string_table[name_offset:].split(b"\0", 1)[0].decode()
+
+            # get the remaining bytes and skip them
+            # this is to use the same class for HFS0 and PFS0
+            self.obj.skip(self.entry_size - 0x14)
+
+            self.file_entry_table.append(PFSEntry(offset, size, name))
+
+
+@dataclass
+class PFSItem(Region):
     entry: PartitionEntry
+    data_pos: int
 
-    def __init__(self, file: File, name: str, entry: PartitionEntry, data_pos: int):
+    def __init__(self, file: File, entry: PFSEntry, data_pos: int):
         self.entry = entry
-        self.name = name
-
         super().__init__(file, entry.offset + data_pos, self.entry.size)
-
-    def __repr__(self):
-        return f"<PFSItem(name={self.name}, offset={self.offset}, end={self.end})>"
 
 
 class PFS0:
-    magic: str
-    partition_entry_count: int
-    string_table_size: int
-    reserved: int
-
-    partition_entry_table: list[PartitionEntry]
-    string_table: bytes
-
-    file_data_pos: int
+    header: PFSHeader
     files: list[str]
 
     def __init__(self, source: IReadable):
         self.source = source
-        self.files = []
-        self.magic = self.source.read_at(0, 4)
 
-        if self.magic != b"PFS0":
-            raise NotAPFS0()
-
-        self.populate_attrs()
-
-    def populate_attrs(self):
-        self.partition_entry_count = self.source.read_to(0x4, 0x4, "<I")
-        self.string_table_size = self.source.read_to(0x8, 0x4, "<I")
-        self.reserved = self.source.read_to(0xC, 0x4, "<I")
-
-        self.partition_entry_table: list[PartitionEntry] = []
-
-        self.source.seek(0x10)
-
-        for _ in range(self.partition_entry_count):
-            entry = PartitionEntry(self.source.read(24))
-            self.partition_entry_table.append(entry)
-
-        self.string_table = self.source.read(self.string_table_size)
-        self.file_data_pos = self.source.tell()
-
-        for x in self.partition_entry_table:
-            self.files.append(
-                self.string_table[x.string_offset :].split(b"\0", 1)[0].decode()
-            )
+        self.header = PFSHeader(source, b"PFS0", 0x18)
 
     def get_file(self, index: int) -> PFSItem:
         return PFSItem(
-            self.source,
-            self.files[index],
-            self.partition_entry_table[index],
-            self.file_data_pos,
+            self.source, self.header.file_entry_table[index], self.header.raw_data_pos
         )
 
     def get_files(self) -> list[PFSItem]:

@@ -1,7 +1,6 @@
-from ..fs.entry import PartitionEntry
-from ..readers import File, EncryptedCtrRegion
+from ..readers import File, EncryptedCtrRegion, IReadable, Readable, Region
 from ..fs.fs import FsHeader, FsType, InvalidFs, EncryptionType, HashType
-from ..fs.pfs0 import PFSItem, PFS0
+from ..fs.pfs0 import PFS0, PFSEntry
 from ..fs.romfs import RomFS
 
 from .header import (
@@ -10,19 +9,23 @@ from .header import (
 from ..keys import Keyring
 
 
-class Nca(PFSItem):
-    name: str
-    entry: PartitionEntry
+class Nca(Readable):
+    entry: PFSEntry | None
 
     header: NcaHeader
 
-    def __init__(self, file: File, name: str, entry: PartitionEntry, data_pos: int):
-        super().__init__(file, name, entry, data_pos)
-        self.end += entry.offset
+    def __init__(self, source: IReadable):
+        super().__init__(source)
         self.keyring = Keyring.get_default()
 
-        header = self.read_at(0, 0xC00)
+        header = source.read_at(0, 0xC00)
         self.header = NcaHeader(header)
+
+    @classmethod
+    def from_entry(self, source: IReadable, entry: PFSEntry, data_pos: int):
+        r = Region(source, entry.offset + data_pos, entry.size + entry.offset)
+        self.entry = entry
+        return Nca(r)
 
     def get_entry_for_header(self, header: FsHeader):
         return [x for x in self.header.fs_entries if x.index == header.index][0]
@@ -67,8 +70,6 @@ class Nca(PFSItem):
             raise InvalidFs(FsType.ROM_FS, header.fs_type)
 
         return RomFS(self.open_fs(header))
-
-    # TODO: make a constructor that takes a file and parse it
 
     def __repr__(self):
         return f"<Nca(name={self.name}, offset={self.offset}, end={self.end})>"

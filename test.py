@@ -1,3 +1,7 @@
+import pathlib
+from nxroms.fs.pfs0 import File
+from nxroms.nacp import Nacp
+from nxroms.nca.nca import Nca
 from nxroms.rom.nsp import Nsp
 from nxroms.rom.xci import Xci
 from nxroms.fs.fs import FsType
@@ -7,7 +11,7 @@ import sys
 
 
 def color(string, color):
-    return color + string + Fore.RESET
+    return color + str(string) + Fore.RESET
 
 
 def colored(*msg, color=Fore.GREEN, level=""):
@@ -40,7 +44,9 @@ def print_nca_filesystems(nca):
 
 
 def print_nca_info(nca):
-    info("nca:", nca.entry.name)
+    if hasattr(nca, "entry"):
+        info("nca:", nca.entry.name)
+
     info("rights id:", nca.header.rights_id)
     if hasattr(nca, "key_area"):
         info("key area:", nca.header.key_area)
@@ -68,6 +74,7 @@ def control_nca(rom: Nsp):
 
         info("found control nca")
         print_nca_info(x)
+        x.dump(x.entry.name)
 
         info("opening romfs")
         romfs = x.open_romfs(x.header.fs_headers[0])
@@ -77,6 +84,19 @@ def control_nca(rom: Nsp):
         for f in romfs.files:
             c = color_ctx(f.name + ":")
             c(f"size {f.size} offset {f.offset}")
+
+        print()
+
+        for f in romfs.files:
+            if f.name != "control.nacp":
+                continue
+            o = romfs.get_file(f)
+            n = Nacp(o)
+
+            t = n.titles[0]
+            info("rom name:", t.name)
+            info("rom publisher:", t.publisher)
+            info("rom version:", n.version)
 
         break
     else:
@@ -95,8 +115,33 @@ def parse_xci(f):
     info(x.header)
 
 
-FILE = sys.argv[1]
+def parse_nca(f: pathlib.Path):
+    file = File(f)
+    x = Nca(file)
+
+    print_nca_info(x)
+
+
+def extract_bytes(f, offset, size):
+    x = File(f)
+    o = open("out.bin", "wb")
+    o.write(x.read_at(offset, size))
+
+
+if len(sys.argv) == 1:
+    colored("pass a file to view its information", color=Fore.YELLOW, level="WARN")
+    sys.exit(1)
+
+FILE = pathlib.Path(sys.argv[1])
 
 info("parsing", color(FILE, Fore.CYAN))
-# parse_xci(FILE)
-parse_nsp(FILE)
+match FILE.suffix:
+    case ".nsp":
+        parse_nsp(FILE)
+    case ".xci":
+        parse_xci(FILE)
+    case ".nca":
+        parse_nca(FILE)
+    case _:
+        colored("invalid file", color=Fore.RED, level="ERROR")
+        sys.exit(1)
